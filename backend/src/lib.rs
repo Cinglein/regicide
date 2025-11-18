@@ -1,7 +1,5 @@
 use axum::{extract::FromRef, routing::get, Router};
 use kanal::Sender;
-use std::sync::Arc;
-use tokio::sync::RwLock;
 use tower_http::{
     compression::CompressionLayer,
     services::{ServeDir, ServeFile},
@@ -35,7 +33,7 @@ const JOIN_BOUND: usize = 1024;
 #[derive(Clone, FromRef)]
 pub struct AppState {
     send_join: Sender<JoinReq<RegicideAction>>,
-    actor_list: Arc<RwLock<Vec<ActorId>>>,
+    actor_list: ActorList,
 }
 
 #[derive(OpenApi)]
@@ -47,11 +45,11 @@ pub async fn serve() {
     let static_service =
         ServeDir::new(dir).not_found_service(ServeFile::new(format!("{dir}/404.html")));
 
-    let actor_list = Arc::new(RwLock::new(Vec::new()));
+    let actor_list = ActorList::default();
     let (send_join, recv_join) = kanal::bounded(JOIN_BOUND);
     let state = AppState {
         send_join,
-        actor_list: Arc::clone(&actor_list),
+        actor_list: actor_list.clone(),
     };
     std::thread::spawn(move || {
         actor_loop(recv_join, actor_list);

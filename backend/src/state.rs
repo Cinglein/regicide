@@ -2,7 +2,6 @@ use crate::*;
 use arrayvec::ArrayVec;
 use rand::rngs::ThreadRng;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use ts_rs::TS;
 use utoipa::ToSchema;
 
@@ -65,22 +64,22 @@ impl UserState {
 #[ts(export, export_to = "../../frontend/src/bindings/")]
 pub enum ServerMsg {
     Join {
-        #[ts(as = "Vec<String>")]
-        #[schema(value_type = Vec<String>)]
-        lobbies: Vec<ActorId>,
-        #[ts(as = "Option<String>")]
-        #[schema(value_type = Option<String>)]
-        joined: Option<ActorId>,
+        #[ts(as = "String")]
+        #[schema(value_type = String)]
+        joined: ActorId,
     },
-    State {
+    Game {
         phase: Phase,
-        #[ts(as = "HashMap<String, u8>")]
-        #[schema(value_type = HashMap<String, u8>)]
-        players: HashMap<UserId, u8>,
+        #[ts(as = "Vec<(String, u8)>")]
+        #[schema(value_type = Vec<(String, u8)>)]
+        players: Vec<(UserId, u8)>,
         library_size: u8,
         discard_size: u8,
         damage: u8,
-        hand: Vec<Card>,
-        resolving: Vec<Vec<Card>>,
+        enemy: JsCard,
+        hand: Vec<JsCard>,
+        resolving: Vec<Vec<JsCard>>,
     },
+    Victory,
+    Defeat,
 }

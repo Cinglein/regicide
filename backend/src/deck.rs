@@ -49,6 +49,9 @@ impl Deck {
     pub fn discard_count(&self) -> usize {
         self.discard.len()
     }
+    pub fn resolving(&self) -> Vec<Vec<JsCard>> {
+        self.resolving.iter().map(|c| c.js_cards()).collect()
+    }
     pub fn jester(&self) -> bool {
         self.resolving
             .iter()

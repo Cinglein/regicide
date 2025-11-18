@@ -1,4 +1,7 @@
 use macros::*;
+use serde::{Deserialize, Serialize};
+use ts_rs::TS;
+use utoipa::ToSchema;
 
 cards! {
     suits: [Heart, Spade, Diamond, Club],
@@ -28,6 +31,34 @@ impl Card {
             } else {
                 1
             }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS, ToSchema)]
+#[ts(export, export_to = "../../frontend/src/bindings/")]
+pub struct JsCard {
+    pub suit: Option<Suit>,
+    pub rank: String,
+    pub value: u8,
+}
+
+impl From<Card> for JsCard {
+    fn from(card: Card) -> Self {
+        Self {
+            suit: card.suit(),
+            rank: card.to_string(),
+            value: card.value(),
+        }
+    }
+}
+
+impl From<&Card> for JsCard {
+    fn from(card: &Card) -> Self {
+        Self {
+            suit: card.suit(),
+            rank: card.to_string(),
+            value: card.value(),
+        }
     }
 }
 
@@ -105,7 +136,30 @@ impl Combo {
             Self::Pair { one, two } => vec![one, two],
             Self::Triple { one, two, three } => vec![one, two, three],
             Self::Quad => {
-                list_cards!(suits: [Heart, Spade, Diamond, Club], ranks: [Two], other: [])
+                vec![
+                    Card::HeartTwo,
+                    Card::SpadeTwo,
+                    Card::DiamondTwo,
+                    Card::ClubTwo,
+                ]
+            }
+        }
+    }
+
+    pub fn js_cards(self) -> Vec<JsCard> {
+        match self {
+            Self::Jester => vec![Card::Joker.into()],
+            Self::Single(card) => vec![card.into()],
+            Self::Companion { card, companion } => vec![card.into(), companion.into()],
+            Self::Pair { one, two } => vec![one.into(), two.into()],
+            Self::Triple { one, two, three } => vec![one.into(), two.into(), three.into()],
+            Self::Quad => {
+                vec![
+                    Card::HeartTwo.into(),
+                    Card::SpadeTwo.into(),
+                    Card::DiamondTwo.into(),
+                    Card::ClubTwo.into(),
+                ]
             }
         }
     }
@@ -118,19 +172,22 @@ impl Combo {
             })
         } else if let Ok([one, two]) = <[Card; 2]>::try_from(cards.as_slice()) {
             match (one.value(), two.value()) {
-                (_, 1) => Some(Combo::Companion {
+                (v, 1) if v != 0 => Some(Combo::Companion {
                     card: one,
                     companion: two,
                 }),
-                (1, _) => Some(Combo::Companion {
+                (1, v) if v != 0 => Some(Combo::Companion {
                     card: two,
                     companion: one,
                 }),
-                (a, b) if a == b && a <= 5 => Some(Combo::Pair { one, two }),
+                (a, b) if a == b && a > 1 && a <= 5 => Some(Combo::Pair { one, two }),
                 _ => None,
             }
         } else if let Ok([one, two, three]) = <[Card; 3]>::try_from(cards.as_slice()) {
-            (one.value() == two.value() && one.value() == three.value() && one.value() <= 3)
+            (one.value() == two.value()
+                && one.value() == three.value()
+                && one.value() <= 3
+                && one.value() > 1)
                 .then_some(Combo::Triple { one, two, three })
         } else if let Ok([one, two, three, four]) = <[Card; 4]>::try_from(cards) {
             (one.value() == 2 && two.value() == 2 && three.value() == 2 && four.value() == 2)

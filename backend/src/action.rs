@@ -1,26 +1,55 @@
 use crate::*;
 use arrayvec::ArrayVec;
 use rand::seq::SliceRandom;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::{collections::HashMap, fmt::Debug};
+use ts_rs::TS;
 
 const MAX_PLAYERS: usize = 4;
 const HAND_SIZE: usize = 9;
 const JESTERS: usize = 2;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+pub trait Action:
+    Clone + Debug + Serialize + DeserializeOwned + TS + Send + Sync + 'static
+{
+    type Shared: Default;
+    type User: Default;
+    type Msg: Serialize + DeserializeOwned + TS + Send + Sync + 'static;
+    fn can_join(shared: &Self::Shared, user: &HashMap<UserId, Self::User>) -> bool;
+    fn update(
+        self,
+        shared: &mut Self::Shared,
+        user: &mut HashMap<UserId, Self::User>,
+        user_id: UserId,
+    );
+    fn join_msg(actor_id: ActorId) -> Self::Msg;
+    fn msg(shared: &Self::Shared, user: &HashMap<UserId, Self::User>) -> Vec<(UserId, Self::Msg)>;
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../frontend/src/bindings/")]
 pub enum RegicideAction {
     Init,
-    Play { cards: ArrayVec<u8, 4> },
-    Discard { cards: ArrayVec<u8, 8> },
-    Jester { player: UserId },
+    Play {
+        #[ts(as = "Vec<u8>")]
+        cards: ArrayVec<u8, 4>,
+    },
+    Discard {
+        #[ts(as = "Vec<u8>")]
+        cards: ArrayVec<u8, 8>,
+    },
+    Jester {
+        #[ts(as = "String")]
+        player: UserId,
+    },
 }
 
 impl Action for RegicideAction {
     type Shared = SharedState;
     type User = UserState;
+    type Msg = ServerMsg;
     fn can_join(shared: &Self::Shared, user: &HashMap<UserId, Self::User>) -> bool {
-        matches!(shared, SharedState::Uninit) && user.len() <= MAX_PLAYERS
+        matches!(shared, SharedState::Uninit) && user.len() < MAX_PLAYERS
     }
     fn update(
         self,
@@ -138,5 +167,60 @@ impl Action for RegicideAction {
             }
             _ => (),
         };
+    }
+    fn join_msg(actor_id: ActorId) -> ServerMsg {
+        ServerMsg::Join { joined: actor_id }
+    }
+    fn msg(shared: &SharedState, user: &HashMap<UserId, UserState>) -> Vec<(UserId, ServerMsg)> {
+        user.keys()
+            .filter_map(|user_id| match shared {
+                SharedState::Init {
+                    phase: Phase::Victory,
+                    ..
+                } => Some((*user_id, ServerMsg::Victory)),
+                SharedState::Init {
+                    phase: Phase::Defeat,
+                    ..
+                } => Some((*user_id, ServerMsg::Defeat)),
+                SharedState::Init {
+                    phase,
+                    deck,
+                    turn_order,
+                    damage,
+                } => {
+                    let players = turn_order
+                        .iter()
+                        .filter_map(|id| {
+                            user.get(id).and_then(|user| match user {
+                                UserState::Init { hand } => Some((*id, hand.len() as u8)),
+                                _ => None,
+                            })
+                        })
+                        .collect();
+                    let library_size = deck.library_count() as u8;
+                    let discard_size = deck.discard_count() as u8;
+                    let enemy = deck.battling()?.into();
+                    let hand = match user.get(user_id)? {
+                        UserState::Init { hand } => Some(hand.iter().map(JsCard::from).collect()),
+                        _ => None,
+                    }?;
+                    let resolving = deck.resolving();
+                    Some((
+                        *user_id,
+                        ServerMsg::Game {
+                            phase: *phase,
+                            players,
+                            library_size,
+                            discard_size,
+                            damage: *damage,
+                            enemy,
+                            hand,
+                            resolving,
+                        },
+                    ))
+                }
+                _ => None,
+            })
+            .collect()
     }
 }
