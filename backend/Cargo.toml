@@ -5,14 +5,12 @@ edition = "2024"
 
 [dependencies]
 serde.workspace = true
-serde_json.workspace = true
 rand.workspace = true
 kanal.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 thiserror.workspace = true
 axum.workspace = true
-tokio.workspace = true
 futures-util.workspace = true
 uuid.workspace = true
 arrayvec.workspace = true
@@ -21,6 +19,8 @@ tower-http.workspace = true
 utoipa.workspace = true
 utoipa-swagger-ui.workspace = true
 ts-rs.workspace = true
+tokio.workspace = true
+postcard.workspace = true
 
 macros = { path = "../macros" }
 game = { path = "../game" }

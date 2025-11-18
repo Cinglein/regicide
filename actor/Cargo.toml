@@ -9,4 +9,4 @@ serde.workspace = true
 kanal.workspace = true
 uuid.workspace = true
 arrayvec.workspace = true
-tokio.workspace = true
+tokio = { version = "1.48.0", features = ["macros"] }

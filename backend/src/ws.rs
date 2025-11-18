@@ -57,39 +57,37 @@ pub async fn ws_handler<A: Action>(
     ws.on_upgrade(async move |mut socket| {
         let mut channels = None;
         while let Some(Ok(msg)) = socket.recv().await {
-            match msg.to_text() {
-                Ok(txt) => match serde_json::from_str(txt) {
-                    Ok(ClientMsg::<A>::Join {
-                        lobby,
-                        client_token,
-                    }) => {
-                        // todo: add auth
-                        let user_id = client_token;
-                        let (send_server_msg, recv_server_msg) = kanal::bounded(MSG_BOUND);
-                        let (send_sender, recv_sender) = kanal::bounded(MSG_BOUND);
-                        let join_req = JoinReq::<A>::Connect {
-                            user_id,
-                            actor_id: lobby,
-                            send_server_msg,
-                            send_sender,
-                        };
-                        match send_join.send(join_req) {
-                            Ok(()) => match recv_sender.to_async().recv().await {
-                                Ok(send_action) => {
-                                    channels = Some(ClientHandle {
-                                        user_id,
-                                        recv_server_msg,
-                                        send_action,
-                                    });
-                                }
-                                Err(_err) => (),
-                            },
+            let bytes = msg.into_data();
+            match postcard::from_bytes(&bytes) {
+                Ok(ClientMsg::<A>::Join {
+                    lobby,
+                    client_token,
+                }) => {
+                    // todo: add auth
+                    let user_id = client_token;
+                    let (send_server_msg, recv_server_msg) = kanal::bounded(MSG_BOUND);
+                    let (send_sender, recv_sender) = kanal::bounded(MSG_BOUND);
+                    let join_req = JoinReq::<A>::Connect {
+                        user_id,
+                        actor_id: lobby,
+                        send_server_msg,
+                        send_sender,
+                    };
+                    match send_join.send(join_req) {
+                        Ok(()) => match recv_sender.to_async().recv().await {
+                            Ok(send_action) => {
+                                channels = Some(ClientHandle {
+                                    user_id,
+                                    recv_server_msg,
+                                    send_action,
+                                });
+                            }
                             Err(_err) => (),
-                        }
+                        },
+                        Err(_err) => (),
                     }
-                    Ok(_other) => (),
-                    Err(_err) => (),
-                },
+                }
+                Ok(_other) => (),
                 Err(_err) => (),
             }
         }
@@ -116,23 +114,21 @@ async fn read<A: Action>(
     send_action: Sender<(A, UserId)>,
 ) {
     while let Some(Ok(msg)) = recv.next().await {
-        match msg.to_text() {
-            Ok(txt) => match serde_json::from_str(txt) {
-                Ok(ClientMsg::Action::<A> { action }) => {
-                    if let Err(_err) = send_action.send((action, user_id)) {}
-                }
-                Ok(_other) => (),
-                Err(_err) => (),
-            },
+        let bytes = msg.into_data();
+        match postcard::from_bytes(&bytes) {
+            Ok(ClientMsg::Action::<A> { action }) => {
+                if let Err(_err) = send_action.send((action, user_id)) {}
+            }
+            Ok(_other) => (),
             Err(_err) => (),
-        }
+        };
     }
 }
 
 async fn write<A: Action>(mut send: SplitSink<WebSocket, Message>, recv: AsyncReceiver<A::Msg>) {
     while let Ok(msg) = recv.recv().await {
-        match serde_json::to_string(&msg) {
-            Ok(txt) => if let Err(_err) = send.send(Message::Text(txt.into())).await {},
+        match postcard::to_stdvec(&msg) {
+            Ok(bytes) => if let Err(_err) = send.send(Message::Binary(bytes.into())).await {},
             Err(_err) => (),
         }
     }
