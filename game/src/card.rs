@@ -1,4 +1,4 @@
-use macros::*;
+use macros::cards;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 use utoipa::ToSchema;

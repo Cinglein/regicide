@@ -1,4 +1,4 @@
-use crate::*;
+use crate::{Card, Combo, JsCard, Suit};
 use arrayvec::ArrayVec;
 use macros::list_cards;
 use rand::{rngs::ThreadRng, seq::SliceRandom};

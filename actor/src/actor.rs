@@ -1,11 +1,13 @@
-use crate::*;
+use crate::Action;
 use arrayvec::ArrayString;
 use kanal::{Receiver, Sender};
 use std::{
     collections::HashMap,
+    sync::Arc,
     thread,
     time::{Duration, Instant},
 };
+use tokio::sync::RwLock;
 use uuid::Uuid;
 
 pub type UserId = ArrayString<32>;
@@ -13,6 +15,19 @@ pub type ActorId = Uuid;
 
 const RECV_BOUND: usize = 128;
 const TICK_MS: Duration = Duration::from_millis(10);
+
+#[derive(Clone, Debug, Default)]
+pub struct ActorList(Arc<RwLock<Vec<(ActorId, u8)>>>);
+
+impl ActorList {
+    pub async fn read(&self) -> Vec<(ActorId, u8)> {
+        self.0.read().await.clone()
+    }
+    pub fn write(&self, list: Vec<(ActorId, u8)>) {
+        let mut lock = self.0.blocking_write();
+        *lock = list;
+    }
+}
 
 pub fn actor_loop<A: Action>(recv: Receiver<JoinReq<A>>, actor_list: ActorList) {
     let mut actors = ActorSystem::<A>::new(recv, actor_list);

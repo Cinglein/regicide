@@ -1,26 +1,8 @@
-use crate::{ActorId, Error};
-use axum::{
-    extract::{FromRef, State},
-    response::IntoResponse,
-    Json,
-};
-use std::sync::Arc;
-use tokio::sync::RwLock;
+use crate::Error;
+use actor::ActorList;
+use axum::{extract::State, response::IntoResponse, Json};
 
 pub const ACTOR_LIST_PATH: &str = "/lobbies";
-
-#[derive(Clone, Debug, Default, FromRef)]
-pub struct ActorList(Arc<RwLock<Vec<(ActorId, u8)>>>);
-
-impl ActorList {
-    pub async fn read(&self) -> Vec<(ActorId, u8)> {
-        self.0.read().await.clone()
-    }
-    pub fn write(&self, list: Vec<(ActorId, u8)>) {
-        let mut lock = self.0.blocking_write();
-        *lock = list;
-    }
-}
 
 #[utoipa::path(
     get,
@@ -31,9 +13,14 @@ impl ActorList {
         (status = 500, description = "Internal server error", body = String)
     )
 )]
+#[tracing::instrument(skip(actor_list))]
 pub async fn get_actor_list(
     State(actor_list): State<ActorList>,
 ) -> Result<impl IntoResponse, Error> {
     let res = actor_list.read().await;
+    let lobby_count = res.len();
+
+    tracing::debug!(lobby_count, "Returning lobby list");
+
     Ok(Json(res))
 }

@@ -1,0 +1,14 @@
+[package]
+name = "game"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ts-rs.workspace = true
+serde.workspace = true
+arrayvec.workspace = true
+utoipa.workspace = true
+rand.workspace = true
+
+actor = { path = "../actor" }
+macros = { path = "../macros" }

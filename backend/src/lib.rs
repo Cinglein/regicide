@@ -1,4 +1,6 @@
+use actor::{actor_loop, ActorList, JoinReq};
 use axum::{extract::FromRef, routing::get, Router};
+use game::RegicideAction;
 use kanal::Sender;
 use tower_http::{
     compression::CompressionLayer,
@@ -8,24 +10,13 @@ use tower_http::{
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
-mod action;
-mod actor;
-mod card;
-mod deck;
 mod error;
 mod list;
-mod phase;
-mod state;
+mod tracing_setup;
 mod ws;
 
-pub use action::*;
-pub use actor::*;
-pub use card::*;
-pub use deck::*;
 pub use error::*;
 pub use list::*;
-pub use phase::*;
-pub use state::*;
 pub use ws::*;
 
 const JOIN_BOUND: usize = 1024;
@@ -41,7 +32,17 @@ pub struct AppState {
 pub struct ApiDoc;
 
 pub async fn serve() {
+    tracing_setup::init_tracing();
+
     let dir = "frontend/out";
+    let bind_addr = "0.0.0.0:3000";
+
+    tracing::info!(
+        dir = %dir,
+        bind_addr = %bind_addr,
+        "Starting Regicide server"
+    );
+
     let static_service =
         ServeDir::new(dir).not_found_service(ServeFile::new(format!("{dir}/404.html")));
 
@@ -51,6 +52,8 @@ pub async fn serve() {
         send_join,
         actor_list: actor_list.clone(),
     };
+
+    tracing::info!("Spawning actor system thread");
     std::thread::spawn(move || {
         actor_loop(recv_join, actor_list);
     });
@@ -64,6 +67,9 @@ pub async fn serve() {
         .layer(CompressionLayer::new())
         .layer(TraceLayer::new_for_http());
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    tracing::info!("Binding to {}", bind_addr);
+    let listener = tokio::net::TcpListener::bind(bind_addr).await.unwrap();
+
+    tracing::info!("Server ready, listening on {}", bind_addr);
     axum::serve(listener, app).await.unwrap();
 }
