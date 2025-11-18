@@ -85,8 +85,7 @@ impl Deck {
             self.discard.extend(
                 std::mem::take(&mut self.resolving)
                     .into_iter()
-                    .map(|combo| combo.cards())
-                    .flatten(),
+                    .flat_map(|combo| combo.cards()),
             );
         }
         self.battling = self.court.pop();
@@ -103,14 +102,14 @@ impl Deck {
         let mut court = ArrayVec::new();
         let mut kings = list_cards!(suits: [Heart, Spade, Diamond, Club], ranks: [King], other: []);
         kings.shuffle(rng);
-        court.try_extend_from_slice(&mut kings).expect("kings");
+        court.try_extend_from_slice(&kings).expect("kings");
         let mut queens =
             list_cards!(suits: [Heart, Spade, Diamond, Club], ranks: [Queen], other: []);
         queens.shuffle(rng);
-        court.try_extend_from_slice(&mut queens).expect("queens");
+        court.try_extend_from_slice(&queens).expect("queens");
         let mut jacks = list_cards!(suits: [Heart, Spade, Diamond, Club], ranks: [Jack], other: []);
         jacks.shuffle(rng);
-        court.try_extend_from_slice(&mut jacks).expect("jacks");
+        court.try_extend_from_slice(&jacks).expect("jacks");
         court
     }
     pub fn library(rng: &mut ThreadRng, jesters: usize) -> Vec<Card> {

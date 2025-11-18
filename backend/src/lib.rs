@@ -1,5 +1,5 @@
-use actor::{actor_loop, ActorList, JoinReq};
-use axum::{extract::FromRef, routing::get, Router};
+use actor::{ActorList, JoinReq, actor_loop};
+use axum::{Router, extract::FromRef, routing::get};
 use game::RegicideAction;
 use kanal::Sender;
 use tower_http::{

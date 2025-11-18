@@ -1,5 +1,5 @@
 use crate::{ActorId, UserId};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use std::{collections::HashMap, fmt::Debug};
 use ts_rs::TS;
 

@@ -1,6 +1,6 @@
 use crate::RegicideAction;
 use actor::{Action, ActorId, UserId};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use ts_rs::TS;
 
 #[derive(Serialize, Deserialize, TS)]

@@ -1,6 +1,6 @@
 use crate::Error;
 use actor::ActorList;
-use axum::{extract::State, response::IntoResponse, Json};
+use axum::{Json, extract::State, response::IntoResponse};
 
 pub const ACTOR_LIST_PATH: &str = "/lobbies";
 

@@ -1,5 +1,5 @@
 use std::env;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
 pub fn init_tracing() {
     let log_format = env::var("LOG_FORMAT").unwrap_or_else(|_| "human".to_string());

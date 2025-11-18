@@ -94,10 +94,10 @@ impl Action for RegicideAction {
                     let max_hand_size = HAND_SIZE - user.len();
                     while draw > 0 {
                         let player = players.next().unwrap();
-                        if let Some(UserState::Init { hand }) = user.get_mut(player) {
-                            if hand.len() < max_hand_size {
-                                hand.push(deck.draw());
-                            }
+                        if let Some(UserState::Init { hand }) = user.get_mut(player)
+                            && hand.len() < max_hand_size
+                        {
+                            hand.push(deck.draw());
                         }
                         draw -= 1;
                     }

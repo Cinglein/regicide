@@ -63,9 +63,9 @@ impl<A: Action> ActorSystem<A> {
             actor.update();
             let msgs = A::msg(&actor.shared, &actor.user);
             msgs.into_iter().for_each(|(user_id, msg)| {
-                if let Some(send) = actor.server_msgs.get(&user_id) {
-                    if let Err(_err) = send.send(msg) {}
-                }
+                if let Some(send) = actor.server_msgs.get(&user_id)
+                    && let Err(_err) = send.send(msg)
+                {}
             });
         });
         while let Ok(Some(join)) = self.recv.try_recv() {
@@ -93,51 +93,46 @@ impl<A: Action> ActorSystem<A> {
                     actor_id,
                     send_action,
                 }) = self.users.get_mut(&user_id)
+                    && let Some(actor) = self.actors.get_mut(actor_id)
                 {
-                    if let Some(actor) = self.actors.get_mut(&actor_id) {
-                        match send_sender.send(send_action.clone()) {
-                            Ok(()) => {
-                                if let Some(send) = actor.server_msgs.get_mut(&user_id) {
-                                    match send_server_msg.send(A::join_msg(*actor_id)) {
-                                        Ok(()) => {
-                                            *send = send_server_msg;
-                                            *connected = true;
-                                        }
-                                        Err(_err) => (),
+                    match send_sender.send(send_action.clone()) {
+                        Ok(()) => {
+                            if let Some(send) = actor.server_msgs.get_mut(&user_id) {
+                                match send_server_msg.send(A::join_msg(*actor_id)) {
+                                    Ok(()) => {
+                                        *send = send_server_msg;
+                                        *connected = true;
                                     }
+                                    Err(_err) => (),
                                 }
+                            }
+                        }
+                        Err(_err) => (),
+                    }
+                } else if let Some(actor) = actor_id.and_then(|id| self.actors.get_mut(&id))
+                    && <A as Action>::can_join(&actor.shared, &actor.user)
+                    && let Some(send_action) = actor
+                        .user
+                        .keys()
+                        .find_map(|id| self.users.get(id).map(|h| h.send_action.clone()))
+                {
+                    match send_sender.send(send_action.clone()) {
+                        Ok(()) => match send_server_msg.send(A::join_msg(actor_id.unwrap())) {
+                            Ok(()) => {
+                                self.users.insert(
+                                    user_id,
+                                    UserHandle {
+                                        connected: true,
+                                        actor_id: actor_id.unwrap(),
+                                        send_action,
+                                    },
+                                );
+                                actor.user.insert(user_id, Default::default());
+                                actor.server_msgs.insert(user_id, send_server_msg);
                             }
                             Err(_err) => (),
-                        }
-                    }
-                } else if let Some(actor) = actor_id.and_then(|id| self.actors.get_mut(&id)) {
-                    if <A as Action>::can_join(&actor.shared, &actor.user) {
-                        if let Some(send_action) = actor
-                            .user
-                            .keys()
-                            .find_map(|id| self.users.get(id).map(|h| h.send_action.clone()))
-                        {
-                            match send_sender.send(send_action.clone()) {
-                                Ok(()) => {
-                                    match send_server_msg.send(A::join_msg(actor_id.unwrap())) {
-                                        Ok(()) => {
-                                            self.users.insert(
-                                                user_id,
-                                                UserHandle {
-                                                    connected: true,
-                                                    actor_id: actor_id.unwrap(),
-                                                    send_action,
-                                                },
-                                            );
-                                            actor.user.insert(user_id, Default::default());
-                                            actor.server_msgs.insert(user_id, send_server_msg);
-                                        }
-                                        Err(_err) => (),
-                                    }
-                                }
-                                Err(_err) => (),
-                            }
-                        }
+                        },
+                        Err(_err) => (),
                     }
                 } else {
                     let (actor, send_action) = Actor::spawn(user_id, send_server_msg);
@@ -180,18 +175,16 @@ impl<A: Action> ActorSystem<A> {
                     self.actors
                         .get(&id)
                         .map(|a| a.user.keys().copied().collect::<Vec<_>>())
-                }) {
-                    if !users
-                        .iter()
-                        .filter_map(|id| self.users.get(id))
-                        .any(|h| h.connected)
-                    {
-                        users.iter().for_each(|id| {
-                            self.users.remove(id);
-                        });
-                        self.actors.remove(&actor_id.unwrap());
-                        self.update_list();
-                    }
+                }) && !users
+                    .iter()
+                    .filter_map(|id| self.users.get(id))
+                    .any(|h| h.connected)
+                {
+                    users.iter().for_each(|id| {
+                        self.users.remove(id);
+                    });
+                    self.actors.remove(&actor_id.unwrap());
+                    self.update_list();
                 }
             }
         }

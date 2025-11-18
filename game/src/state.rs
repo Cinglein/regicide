@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 use utoipa::ToSchema;
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Default, Debug)]
 pub enum SharedState {
     #[default]
@@ -44,19 +45,16 @@ pub enum UserState {
 impl UserState {
     pub fn cards<const N: usize>(&mut self, mut cards: ArrayVec<u8, N>) -> Vec<Card> {
         let mut out = Vec::new();
-        match self {
-            Self::Init { hand } => {
-                let mut index = None;
-                cards.sort();
-                while let Some(i) = cards.pop() {
-                    if index != Some(i) && hand.len() > i as usize {
-                        out.push(hand.remove(i as usize));
-                    }
-                    index = Some(i);
+        if let Self::Init { hand } = self {
+            let mut index = None;
+            cards.sort();
+            while let Some(i) = cards.pop() {
+                if index != Some(i) && hand.len() > i as usize {
+                    out.push(hand.remove(i as usize));
                 }
+                index = Some(i);
             }
-            _ => (),
-        };
+        }
         out
     }
 }

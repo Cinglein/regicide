@@ -2,10 +2,9 @@ use itertools::Itertools;
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 use syn::{
-    bracketed,
+    Ident, LitInt, Token, bracketed,
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
-    Ident, LitInt, Token,
 };
 
 mod kw {

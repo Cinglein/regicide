@@ -1,9 +1,9 @@
 use crate::*;
-use actor::{Action, ActorId, UserId};
+use actor::{Action, UserId};
 use axum::{
     extract::{
-        ws::{Message, WebSocket, WebSocketUpgrade},
         State,
+        ws::{Message, WebSocket, WebSocketUpgrade},
     },
     response::IntoResponse,
 };
@@ -11,30 +11,12 @@ use futures_util::{
     sink::SinkExt,
     stream::{SplitSink, SplitStream, StreamExt},
 };
-use game::{RegicideAction, ServerMsg};
+use game::{ClientMsg, ServerMsg};
 use kanal::{AsyncReceiver, Receiver, Sender};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use ts_rs::TS;
 
 pub const WS_HANDLER_PATH: &str = "/ws";
 
 const MSG_BOUND: usize = 16;
-
-#[derive(Serialize, Deserialize, TS)]
-#[serde(bound = "A: Serialize + DeserializeOwned")]
-#[ts(concrete(A = RegicideAction))]
-#[ts(export, export_to = "../../frontend/src/bindings/")]
-pub enum ClientMsg<A: Action> {
-    Join {
-        #[ts(as = "Option<String>")]
-        lobby: Option<ActorId>,
-        #[ts(as = "String")]
-        client_token: UserId,
-    },
-    Action {
-        action: A,
-    },
-}
 
 struct ClientHandle<A: Action> {
     user_id: UserId,
