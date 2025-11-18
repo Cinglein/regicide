@@ -3,8 +3,10 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 const LOBBIES_ENDPOINT = '/lobbies';
 const REFRESH_INTERVAL = 5000;
 
+type Lobby = [string, number];
+
 export function useLobbies(autoRefresh: boolean = true) {
-  const [lobbies, setLobbies] = useState<string[]>([]);
+  const [lobbies, setLobbies] = useState<Lobby[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -18,7 +20,7 @@ export function useLobbies(autoRefresh: boolean = true) {
       if (!response.ok) {
         throw new Error(`Failed to fetch lobbies: ${response.statusText}`);
       }
-      const data: string[] = await response.json();
+      const data: Lobby[] = await response.json();
       setLobbies(data);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';

@@ -63,7 +63,6 @@ impl UserState {
 #[ts(export, export_to = "../../frontend/src/bindings/")]
 pub enum ServerMsg {
     Join {
-        #[ts(as = "String")]
         #[schema(value_type = String)]
         joined: ActorId,
     },

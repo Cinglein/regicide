@@ -8,6 +8,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::sync::RwLock;
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 pub type UserId = ArrayString<32>;
@@ -30,6 +31,10 @@ impl ActorList {
 }
 
 pub fn actor_loop<A: Action>(recv: Receiver<JoinReq<A>>, actor_list: ActorList) {
+    info!(
+        "Actor loop started with {}ms tick rate",
+        TICK_MS.as_millis()
+    );
     let mut actors = ActorSystem::<A>::new(recv, actor_list);
     let mut next = Instant::now() + TICK_MS;
     loop {
@@ -64,8 +69,10 @@ impl<A: Action> ActorSystem<A> {
             let msgs = A::msg(&actor.shared, &actor.user);
             msgs.into_iter().for_each(|(user_id, msg)| {
                 if let Some(send) = actor.server_msgs.get(&user_id)
-                    && let Err(_err) = send.send(msg)
-                {}
+                    && let Err(err) = send.send(msg)
+                {
+                    warn!(%user_id, error = %err, "Failed to send server message to user");
+                }
             });
         });
         while let Ok(Some(join)) = self.recv.try_recv() {
@@ -102,12 +109,17 @@ impl<A: Action> ActorSystem<A> {
                                     Ok(()) => {
                                         *send = send_server_msg;
                                         *connected = true;
+                                        info!(%user_id, %actor_id, "User reconnected to actor");
                                     }
-                                    Err(_err) => (),
+                                    Err(err) => {
+                                        error!(%user_id, %actor_id, error = %err, "Failed to send join message on reconnect");
+                                    }
                                 }
                             }
                         }
-                        Err(_err) => (),
+                        Err(err) => {
+                            error!(%user_id, error = %err, "Failed to send action sender on reconnect");
+                        }
                     }
                 } else if let Some(actor) = actor_id.and_then(|id| self.actors.get_mut(&id))
                     && <A as Action>::can_join(&actor.shared, &actor.user)
@@ -116,23 +128,29 @@ impl<A: Action> ActorSystem<A> {
                         .keys()
                         .find_map(|id| self.users.get(id).map(|h| h.send_action.clone()))
                 {
+                    let aid = actor_id.unwrap();
                     match send_sender.send(send_action.clone()) {
-                        Ok(()) => match send_server_msg.send(A::join_msg(actor_id.unwrap())) {
+                        Ok(()) => match send_server_msg.send(A::join_msg(aid)) {
                             Ok(()) => {
                                 self.users.insert(
                                     user_id,
                                     UserHandle {
                                         connected: true,
-                                        actor_id: actor_id.unwrap(),
+                                        actor_id: aid,
                                         send_action,
                                     },
                                 );
                                 actor.user.insert(user_id, Default::default());
                                 actor.server_msgs.insert(user_id, send_server_msg);
+                                info!(%user_id, actor_id = %aid, player_count = actor.user.len(), "User joined existing actor");
                             }
-                            Err(_err) => (),
+                            Err(err) => {
+                                error!(%user_id, actor_id = %aid, error = %err, "Failed to send join message");
+                            }
                         },
-                        Err(_err) => (),
+                        Err(err) => {
+                            error!(%user_id, actor_id = %aid, error = %err, "Failed to send action sender");
+                        }
                     }
                 } else {
                     let (actor, send_action) = Actor::spawn(user_id, send_server_msg);
@@ -156,19 +174,26 @@ impl<A: Action> ActorSystem<A> {
                                         },
                                     );
                                     self.update_list();
+                                    info!(%user_id, %actor_id, "Created new actor for user");
                                 }
-                                Err(_err) => (),
+                                Err(err) => {
+                                    error!(%user_id, %actor_id, error = %err, "Failed to send join message for new actor");
+                                }
                             }
                         }
-                        Err(_err) => (),
+                        Err(err) => {
+                            error!(%user_id, error = %err, "Failed to send action sender for new actor");
+                        }
                     }
                 }
             }
             JoinReq::Disconnect { user_id } => {
                 let actor_id = if let Some(handle) = self.users.get_mut(&user_id) {
                     handle.connected = false;
+                    debug!(%user_id, actor_id = %handle.actor_id, "User disconnected");
                     Some(handle.actor_id)
                 } else {
+                    debug!(%user_id, "Disconnect for unknown user");
                     None
                 };
                 if let Some(users) = actor_id.and_then(|id| {
@@ -180,11 +205,13 @@ impl<A: Action> ActorSystem<A> {
                     .filter_map(|id| self.users.get(id))
                     .any(|h| h.connected)
                 {
+                    let aid = actor_id.unwrap();
                     users.iter().for_each(|id| {
                         self.users.remove(id);
                     });
-                    self.actors.remove(&actor_id.unwrap());
+                    self.actors.remove(&aid);
                     self.update_list();
+                    info!(actor_id = %aid, "Removed actor - all users disconnected");
                 }
             }
         }

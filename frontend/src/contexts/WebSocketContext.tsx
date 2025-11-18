@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useEffect, useRef, useCallback, ty
 import type { ClientMsg } from '@/bindings/ClientMsg';
 import type { ServerMsg } from '@/bindings/ServerMsg';
 import { createJoinMessage, sendWebSocketMessage } from '@/lib/websocket';
+import { initWasm, deserializeMessage } from '@/lib/parse';
 
 export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting';
 
@@ -77,61 +78,68 @@ export function WebSocketProvider({
       setConnectionState('connecting');
       setRetryAttempt(0);
 
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/ws`;
-      const websocket = new WebSocket(wsUrl);
+      initWasm().then(() => {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws`;
+        const websocket = new WebSocket(wsUrl);
+        websocket.binaryType = 'arraybuffer';
 
-      websocket.onopen = () => {
-        setConnectionState('connected');
-        setRetryAttempt(0);
-        setNextRetryIn(0);
-        clearRetryTimers();
+        websocket.onopen = () => {
+          setConnectionState('connected');
+          setRetryAttempt(0);
+          setNextRetryIn(0);
+          clearRetryTimers();
 
-        const joinMsg = createJoinMessage(token, lobbyId);
-        sendWebSocketMessage(websocket, joinMsg);
-      };
+          const joinMsg = createJoinMessage(token, lobbyId);
+          sendWebSocketMessage(websocket, joinMsg);
+        };
 
-      websocket.onmessage = (event) => {
-        try {
-          const msg: ServerMsg = JSON.parse(event.data);
-          onMessage(msg);
-        } catch (error) {
-          console.error('Failed to parse WebSocket message:', error);
-        }
-      };
+        websocket.onmessage = (event) => {
+          try {
+            const bytes = new Uint8Array(event.data);
+            const msg = deserializeMessage(bytes) as ServerMsg;
+            onMessage(msg);
+          } catch (error) {
+            console.error('Failed to parse WebSocket message:', error);
+          }
+        };
 
-      websocket.onerror = (error) => {
-        console.error('WebSocket error:', error);
-      };
+        websocket.onerror = (error) => {
+          console.error('WebSocket error:', error);
+        };
 
-      websocket.onclose = () => {
-        setWs(null);
-        wsRef.current = null;
+        websocket.onclose = () => {
+          setWs(null);
+          wsRef.current = null;
 
-        if (shouldReconnectRef.current && retryAttempt < MAX_RETRY_ATTEMPTS) {
-          setConnectionState('reconnecting');
-          const delay = Math.min(BASE_DELAY * Math.pow(2, retryAttempt), MAX_DELAY);
-          setNextRetryIn(Math.floor(delay / 1000));
+          if (shouldReconnectRef.current && retryAttempt < MAX_RETRY_ATTEMPTS) {
+            setConnectionState('reconnecting');
+            const delay = Math.min(BASE_DELAY * Math.pow(2, retryAttempt), MAX_DELAY);
+            setNextRetryIn(Math.floor(delay / 1000));
 
-          retryIntervalRef.current = setInterval(() => {
-            setNextRetryIn((prev) => Math.max(0, prev - 1));
-          }, 1000);
+            retryIntervalRef.current = setInterval(() => {
+              setNextRetryIn((prev) => Math.max(0, prev - 1));
+            }, 1000);
 
-          retryTimeoutRef.current = setTimeout(() => {
-            clearRetryTimers();
-            setRetryAttempt((prev) => prev + 1);
-            if (currentTokenRef.current) {
-              connect(currentTokenRef.current, currentLobbyIdRef.current);
-            }
-          }, delay);
-        } else if (shouldReconnectRef.current) {
-          setConnectionState('disconnected');
-          shouldReconnectRef.current = false;
-        }
-      };
+            retryTimeoutRef.current = setTimeout(() => {
+              clearRetryTimers();
+              setRetryAttempt((prev) => prev + 1);
+              if (currentTokenRef.current) {
+                connect(currentTokenRef.current, currentLobbyIdRef.current);
+              }
+            }, delay);
+          } else if (shouldReconnectRef.current) {
+            setConnectionState('disconnected');
+            shouldReconnectRef.current = false;
+          }
+        };
 
-      wsRef.current = websocket;
-      setWs(websocket);
+        wsRef.current = websocket;
+        setWs(websocket);
+      }).catch((error) => {
+        console.error('Failed to initialize WASM:', error);
+        setConnectionState('disconnected');
+      });
     },
     [disconnect, retryAttempt, onMessage, clearRetryTimers]
   );

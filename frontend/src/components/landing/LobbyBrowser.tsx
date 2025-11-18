@@ -81,7 +81,7 @@ export function LobbyBrowser({ onJoinSuccess }: LobbyBrowserProps) {
                 </td>
               </tr>
             ) : (
-              lobbies.map((lobbyId) => (
+              lobbies.map(([lobbyId, count]) => (
                 <tr
                   key={lobbyId}
                   onClick={() => handleRowClick(lobbyId)}
@@ -98,7 +98,7 @@ export function LobbyBrowser({ onJoinSuccess }: LobbyBrowserProps) {
                     {lobbyId}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
-                    ?
+										{count}
                   </td>
                 </tr>
               ))

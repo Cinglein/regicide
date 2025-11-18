@@ -10,6 +10,7 @@ arrayvec.workspace = true
 utoipa.workspace = true
 rand.workspace = true
 getrandom.workspace = true
+tracing.workspace = true
 
 actor = { path = "../actor" }
 macros = { path = "../macros" }

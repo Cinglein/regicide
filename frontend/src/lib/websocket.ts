@@ -1,5 +1,6 @@
 import type { ClientMsg } from '@/bindings/ClientMsg';
 import type { RegicideAction } from '@/bindings/RegicideAction';
+import { serializeMessage } from './parse';
 
 export function createJoinMessage(clientToken: string, lobbyId: string | null): ClientMsg {
   return {
@@ -23,7 +24,8 @@ export function sendWebSocketMessage(ws: WebSocket | null, msg: ClientMsg): bool
     return false;
   }
   try {
-    ws.send(JSON.stringify(msg));
+    const bytes = serializeMessage(msg);
+    ws.send(bytes);
     return true;
   } catch (error) {
     console.error('Failed to send WebSocket message:', error);

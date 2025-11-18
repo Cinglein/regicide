@@ -21,7 +21,7 @@ axum = { version = "0.8.7", features = ["macros","ws"] }
 uuid = { version = "1.18.1", features = ["serde", "v7", "rng-rand"] }
 arrayvec = { version = "0.7.6", features = ["serde"] }
 futures-util = "0.3.31"
-ts-rs = { version = "11.0.1", features = ["chrono", "chrono-impl", "serde-json-impl", "serde_json", "tokio", "tokio-impl"] }
+ts-rs = { version = "11.0.1", features = ["chrono", "chrono-impl", "serde-json-impl", "serde_json", "tokio", "tokio-impl", "uuid", "uuid-impl"] }
 utoipa = { version = "5.4.0", features = ["axum_extras", "chrono"] }
 utoipa-swagger-ui = { version = "9.0.2", features = ["axum"] }
 tower-http = { version = "0.6.6", features = ["compression-br", "compression-gzip", "cors", "fs", "trace"] }
